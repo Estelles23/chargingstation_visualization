@@ -25,16 +25,21 @@ def create_derived_columns(df):
         df['Date'] = df['Arrival'].dt.date
         df['Hour'] = df['Arrival'].dt.hour
 
-        # Day of week (0=Monday, 6=Sunday)
+        #Day of week (0=Monday, 6=Sunday)
         df['DayOfWeek'] = df['Arrival'].dt.dayofweek
 
-        # Week number and year
+        #Week number and year
         df['Week'] = df['Arrival'].dt.isocalendar().week
         df['Year'] = df['Arrival'].dt.year
 
-        # Extract month and year
+        #Extract month and year
         df['Month'] = df['Arrival'].dt.month
-        df['YearMonth'] = df['Arrival'].dt.to_period('M')
+
+        #For calculating aggregates
+        df['YearMonth_Period'] = df['Arrival'].dt.to_period('M')
+        #For Plotly
+        df['YearMonth'] = df['Arrival'].dt.to_period('M').astype(str)
+
 
         # Convert Wh to kWh and calculate revenue (prices for Switzerland)
         df['Energy_kWh'] = df['Energy (Wh)'] / 1000
@@ -77,30 +82,47 @@ def create_weekly_aggregate_df(df):
     return weekly_agg
 
 def create_monthly_aggregate_df(df):
-    monthly_agg = df.groupby('YearMonth').agg({
+    monthly_agg = df.groupby('YearMonth_Period').agg({  # Use YearMonth_Period here
         'Energy_kWh': 'sum',
         'Session': 'count',
         'Revenue_EUR': 'mean'
     }).reset_index()
 
-    monthly_agg.columns = ['YearMonth', 'Total_kWh', 'Num_Sessions', 'Avg_Revenue_per_Session']
+    monthly_agg.columns = ['YearMonth_Period', 'Total_kWh', 'Num_Sessions', 'Avg_Revenue_per_Session']
 
-    #Selecting the first day of the month and creating the column
-    monthly_agg['Date'] = monthly_agg['YearMonth'].dt.to_timestamp()
+    # Selecting the first day of the month and creating the column
+    monthly_agg['Date'] = monthly_agg['YearMonth_Period'].dt.to_timestamp()
 
     return monthly_agg
 
-#Cleaning the data and creating auxiliar df.
+def create_hourly_sessions(df):
+    hourly_sessions = df.groupby('Hour').size().reset_index(name='Session_Count')
+
+    return hourly_sessions
+
+def create_weekday_sessions(df):
+    weekday_sessions = df.groupby('DayOfWeek').size().reset_index(name='Session_Count')
+
+    return weekday_sessions
+
+def create_monthly_sessions(df):
+    monthly_sessions = df.groupby('YearMonth').size().reset_index(name='Session_Count')
+
+    return monthly_sessions
+
+#Cleaning the data
 df = correct_data_types(df)
 df = create_derived_columns(df)
+
+#Auxiliar dfs
 daily_agg = create_daily_aggregate_df(df)
 weekly_agg = create_weekly_aggregate_df(df)
 monthly_agg = create_monthly_aggregate_df(df)
+hourly_sessions = create_hourly_sessions(df)
+weekday_sessions = create_weekday_sessions(df)
+monthly_sessions = create_monthly_sessions(df)
 
 print("*" * 80)
-print(f"Daily records: {len(daily_agg)}")
-print(f"Weekly records: {len(weekly_agg)}")
-print(f"Monthly records: {len(monthly_agg)}")
 print("*" * 80)
 
 app = dash.Dash(__name__)
@@ -130,8 +152,59 @@ app.layout = html.Div([
         value='Total_kWh'
     ),
 
-    dcc.Graph(id='revenue-graph')
+    dcc.Graph(id='revenue-graph'),
+
+    # NEW SECTION for Utilization
+    html.H2("Utilization Rate by Time of Day"),
+
+    html.Label("View By:"),
+    dcc.Dropdown(
+        id='utilization-view-dropdown',
+        options=[
+            {'label': 'Hour of Day', 'value': 'hour'},
+            {'label': 'Day of Week', 'value': 'weekday'},
+            {'label': 'Month', 'value': 'month'}
+        ],
+        value='hour'
+    ),
+
+    dcc.Graph(id='hourly-utilization-graph')
 ])
+
+
+@app.callback(
+    Output('hourly-utilization-graph', 'figure'),
+    Input('utilization-view-dropdown', 'value')
+)
+def update_utilization_graph(view_type):
+    # Select which data to use based on dropdown
+    if view_type == 'hour':
+        data = hourly_sessions
+        x_col = 'Hour'
+        title = 'Number of Sessions by Hour of Day'
+        x_label = 'Hour of Day (0-23)'
+    elif view_type == 'weekday':
+        data = weekday_sessions
+        x_col = 'DayOfWeek'
+        title = 'Number of Sessions by Day of Week'
+        x_label = 'Day of Week (0=Monday, 6=Sunday)'
+    else:  # month
+        data = monthly_sessions
+        x_col = 'YearMonth'
+        title = 'Number of Sessions by Month'
+        x_label = 'Month'
+
+    # Create the bar chart
+    fig = px.bar(data, x=x_col, y='Session_Count',
+                 title=title,
+                 labels={x_col: x_label, 'Session_Count': 'Total Sessions'})
+    if view_type == "month":
+        fig.update_xaxes(
+            tickmode='array',
+            tickvals=data['YearMonth'],  # Use all values from your data
+            tickangle=-45
+        )
+    return fig
 
 @app.callback(
     Output('revenue-graph', 'figure'),
@@ -139,7 +212,7 @@ app.layout = html.Div([
      Input('metric-dropdown', 'value')]
 )
 
-def update_graph(time_period, metric):
+def update_revenue_graph(time_period, metric):
     #dataframe selection
     if time_period == 'daily':
         data = daily_agg
