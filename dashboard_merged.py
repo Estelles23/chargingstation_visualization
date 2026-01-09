@@ -1333,10 +1333,7 @@ def main():
         )
         return fig
 
-    app.run(debug=True)
-
-
 ################################################################################################
 
-if __name__ == '__main__':
-    main()
+app = dash.Dash(__name__)
+server = app.server
