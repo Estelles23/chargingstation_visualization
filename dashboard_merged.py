@@ -1335,6 +1335,8 @@ def main():
         return fig
 
 ################################################################################################
+server = None
+main()
+
 if __name__ == '__main__':
-    server = None
-    main()
+    app.run(debug=True)
