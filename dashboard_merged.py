@@ -927,228 +927,318 @@ def main():
     app = dash.Dash(__name__)
     global server
     server = app.server
+
+    ################################################################################################
+    # NAVIGATION BAR
+    ################################################################################################
+
+    # Bar interactivity
+    pages = [
+    {"label": "Revenue", "href": "/revenue"},
+    {"label": "Customer", "href": "/customer"},
+    {"label": "Efficiency", "href": "/efficiency"},
+    {"label": "Heatmap", "href": "/heatmap"},
+    {"label": "Infrastructure", "href": "/infrastructure"}
+    ]
+
+    def create_navbar(active_page=None):
+        links = []
+        for page in pages:
+            # Style changes if this page is active
+            style = {
+                "padding": "10px 20px",
+                "margin": "5px",
+                "textDecoration": "none",
+                "fontWeight": "bold",
+                "color": "white",
+                "backgroundColor": "#002C39" if active_page == page["href"] else "#0C4A59",
+                "borderRadius": "5px",
+                "cursor": "pointer"
+            }
+            links.append(dcc.Link(page["label"], href=page["href"], style=style, id={"type": "nav-link", "index": page["href"]}))
+        return html.Div(links, style={"display": "flex", "flexDirection": "row"})
+    
+    app.layout = html.Div([
+        dcc.Location(id='url', refresh=False),
+        html.Div(id='nav-bar'),
+        html.Div(id='page-content', children="Page content here...")
+    ])
+
+    @app.callback(
+        Output('nav-bar', 'children'),
+        Input('url', 'pathname')
+    )
+    def update_navbar(pathname):
+        return create_navbar(active_page=pathname)
+
+
     ################################################################################################
     # LAYOUT
     ################################################################################################
 
     app.layout = html.Div([
-
-        # ==================== RQ1: REVENUE ANALYSIS (NEW) ====================
-        html.H1("Revenue & Temporal Analysis", style={'textAlign': 'center'}),
-        html.Hr(),
-
-        # Row 1: Sessions per Hour and Energy per Hour
-        html.Div([
-            html.Div([
-                dcc.Graph(figure=revenue_figs['hour_sessions'], style={'height': '400px'})
-            ], style={'flex': '1', 'minWidth': '0'}),
-            html.Div([
-                dcc.Graph(figure=revenue_figs['hour_energy'], style={'height': '400px'})
-            ], style={'flex': '1', 'minWidth': '0'})
-        ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px'}),
-
-        # Row 2: Revenue per Hour and Sessions per Weekday
-        html.Div([
-            html.Div([
-                dcc.Graph(figure=revenue_figs['hour_revenue'], style={'height': '400px'})
-            ], style={'flex': '1', 'minWidth': '0'}),
-            html.Div([
-                dcc.Graph(figure=revenue_figs['weekday_sessions'], style={'height': '400px'})
-            ], style={'flex': '1', 'minWidth': '0'})
-        ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'marginTop': '10px'}),
-
-        # Row 3: Revenue Trend (full width)
-        dcc.Graph(figure=revenue_figs['date_revenue'], style={'height': '400px', 'marginTop': '10px'}),
-
-        # Row 4: Peak vs Off-Peak and Idle Time Analysis
-        html.Div([
-            html.Div([
-                dcc.Graph(figure=revenue_figs['peak_offpeak'], style={'height': '400px'})
-            ], style={'flex': '1', 'minWidth': '0'}),
-            html.Div([
-                dcc.Graph(figure=revenue_figs['idle_hour'], style={'height': '400px'})
-            ], style={'flex': '1', 'minWidth': '0'}),
-            html.Div([
-                dcc.Graph(figure=revenue_figs['idle_peak'], style={'height': '400px'})
-            ], style={'flex': '1', 'minWidth': '0'})
-        ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'marginTop': '10px'}),
-
-        # ==================== RQ2: CUSTOMER CHARGING BEHAVIOR ====================
-        html.Div([
-            html.Hr(),
-            html.H1("Customer Charging Behavior", style={'textAlign': 'center'}),
-
-            # RQ2 Filter Dropdown
-            html.Div([
-                html.Label('Filter by Control Status:', style={'fontWeight': 'bold', 'marginRight': '10px'}),
-                dcc.Dropdown(
-                    id="controlled-filter",
-                    options=[
-                        {"label": "All sessions", "value": "all"},
-                        {"label": "Controlled only", "value": 1},
-                        {"label": "Uncontrolled only", "value": 0},
-                    ],
-                    value="all",
-                    clearable=False,
-                    style={"width": "200px"}
-                )
-            ], style={
-                'display': 'flex', 'alignItems': 'center',
-                'padding': '20px 10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'
+        dcc.Location(id='url', refresh=False),
+        html.Div(
+            id='nav-bar', 
+            style={
+                "display": "flex",
+                "justifyContent": "center",  
+                "alignItems": "center",      
+                "width": "100%"
             }),
+        html.Div(id='page-content')  # This will hold the current page
+    ])
+    
+    # ==================== RQ1: REVENUE ANALYSIS (NEW) ====================
+    def layout_revenue(revenue_figs):
+        return html.Div([
+            html.H1("Revenue & Temporal Analysis", style={'textAlign': 'center'}),
+            html.Hr(),
 
-            # RQ2 Charts - Row 1: Histogram and Scatter side by side
+            # Row 1: Sessions per Hour and Energy per Hour
             html.Div([
                 html.Div([
-                    dcc.Graph(id="hist_soc_arrival", style={'height': '500px'})
+                    dcc.Graph(figure=revenue_figs['hour_sessions'], style={'height': '400px'})
                 ], style={'flex': '1', 'minWidth': '0'}),
-
                 html.Div([
-                    dcc.Graph(id="scatter_stay_energy", style={'height': '500px'})
+                    dcc.Graph(figure=revenue_figs['hour_energy'], style={'height': '400px'})
                 ], style={'flex': '1', 'minWidth': '0'})
             ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px'}),
 
-            # RQ2 Charts - Row 2: Box plot (full width)
-            dcc.Graph(id="box_time_period")
-        ]),  # End of RQ2 section
-
-        # ==================== RQ3: OPERATIONAL EFFICIENCY ====================
-        html.Div([
-            html.Hr(),
-            html.H1("Operational Efficiency & Power Management", style={'textAlign': 'center'}),
-
-            # Timeline (full width)
-            dcc.Graph(figure=rq3_figs['timeline'], style={'height': '300px'}),
-
-            # Row: Bar chart, Scatter plot, Line chart side by side
+            # Row 2: Revenue per Hour and Sessions per Weekday
             html.Div([
                 html.Div([
-                    dcc.Graph(figure=rq3_figs['bar_controlled'], style={'height': '400px'})
+                    dcc.Graph(figure=revenue_figs['hour_revenue'], style={'height': '400px'})
                 ], style={'flex': '1', 'minWidth': '0'}),
-
                 html.Div([
-                    dcc.Graph(figure=rq3_figs['scatter_preq_pset'], style={'height': '400px'})
-                ], style={'flex': '2', 'minWidth': '0'}),
+                    dcc.Graph(figure=revenue_figs['weekday_sessions'], style={'height': '400px'})
+                ], style={'flex': '1', 'minWidth': '0'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'marginTop': '10px'}),
 
-                html.Div([
-                    dcc.Graph(figure=rq3_figs['line_power_time'], style={'height': '400px'})
-                ], style={'flex': '2', 'minWidth': '0'})
-            ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'marginTop': '10px'})
-        ]),
+            # Row 3: Revenue Trend (full width)
+            dcc.Graph(figure=revenue_figs['date_revenue'], style={'height': '400px', 'marginTop': '10px'}),
 
-        # ==================== RQ1: HEATMAP UTILIZATION ====================
-        html.Div([
-            html.Hr(),
-            html.H1("Utilization Heatmap Analysis", style={'textAlign': 'center'}),
-
-            # --- RQ1 CONTROL PANEL ---
+            # Row 4: Peak vs Off-Peak and Idle Time Analysis
             html.Div([
-                # Left: Dynamic Title
-                html.H2(id='chart-title', children="Sessions by Hour and Day", style={
-                    'margin': '0', 'fontSize': '1.5em', 'minWidth': '350px'
+                html.Div([
+                    dcc.Graph(figure=revenue_figs['peak_offpeak'], style={'height': '400px'})
+                ], style={'flex': '1', 'minWidth': '0'}),
+                html.Div([
+                    dcc.Graph(figure=revenue_figs['idle_hour'], style={'height': '400px'})
+                ], style={'flex': '1', 'minWidth': '0'}),
+                html.Div([
+                    dcc.Graph(figure=revenue_figs['idle_peak'], style={'height': '400px'})
+                ], style={'flex': '1', 'minWidth': '0'})
+            ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'marginTop': '10px'}),
+        ])
+    
+    # ==================== RQ2: CUSTOMER CHARGING BEHAVIOR ====================
+    def layout_customer():
+        return html.Div([
+            html.Div([
+                html.Hr(),
+                html.H1("Customer Charging Behavior", style={'textAlign': 'center'}),
+
+                # RQ2 Filter Dropdown
+                html.Div([
+                    html.Label('Filter by Control Status:', style={'fontWeight': 'bold', 'marginRight': '10px'}),
+                    dcc.Dropdown(
+                        id="controlled-filter",
+                        options=[
+                            {"label": "All sessions", "value": "all"},
+                            {"label": "Controlled only", "value": 1},
+                            {"label": "Uncontrolled only", "value": 0},
+                        ],
+                        value="all",
+                        clearable=False,
+                        style={"width": "200px"}
+                    )
+                ], style={
+                    'display': 'flex', 'alignItems': 'center',
+                    'padding': '20px 10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'
                 }),
 
-                # Center: Legend
-                html.Div(id='highlight-legend', style={'display': 'none', 'alignItems': 'center'}, children=[
-                    html.Div(
-                        style={'width': '10px', 'height': '10px', 'backgroundColor': 'green', 'marginRight': '5px'}),
-                    html.Span('Off-Peak Hours n = 57 (3.1%)', style={'marginRight': '15px', 'fontSize': '0.9em'}),
-                    html.Div(style={'width': '10px', 'height': '10px', 'backgroundColor': 'red', 'marginRight': '5px'}),
-                    html.Span('Business Hours n = 1503 (80%)', style={'fontSize': '0.9em'}),
-                ]),
-
-                # Right: Controls
+                # RQ2 Charts - Row 1: Histogram and Scatter side by side
                 html.Div([
                     html.Div([
-                        html.Label('Metric', style={'fontWeight': 'bold', 'marginRight': '10px'}),
-                        dcc.Dropdown(
-                            id='metric-dropdown',
-                            options=[
-                                {'label': 'Session Counts', 'value': 'SESSIONS'},
-                                {'label': 'Concurrent Overlaps', 'value': 'OVERLAPS'}
-                            ],
-                            value='SESSIONS',
-                            clearable=False,
-                            style={'width': '180px'}
-                        )
-                    ], style={'marginRight': '30px', 'display': 'flex', 'alignItems': 'center'}),
+                        dcc.Graph(id="hist_soc_arrival", style={'height': '500px'})
+                    ], style={'flex': '1', 'minWidth': '0'}),
 
                     html.Div([
-                        html.Div([
-                            html.Label('Show Labels'),
-                            dcc.Checklist(id='show-count-labels', options=[{'label': ' Yes', 'value': 'SHOW_TEXT'}],
-                                          value=[], inline=True)
-                        ], style={'marginRight': '15px'}),
+                        dcc.Graph(id="scatter_stay_energy", style={'height': '500px'})
+                    ], style={'flex': '1', 'minWidth': '0'})
+                ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px'}),
 
-                        html.Div([
-                            html.Label('Show Highlights'),
-                            dcc.Checklist(id='show-highlight-boxes',
-                                          options=[{'label': ' Yes', 'value': 'SHOW_SHAPES'}],
-                                          value=[], inline=True)
-                        ])
-                    ], style={'display': 'flex', 'alignItems': 'center'})
-                ], style={'display': 'flex', 'alignItems': 'center'})
-            ], style={
-                'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center',
-                'padding': '20px 10px 10px 10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'
-            }),
-
-            # --- RQ1 HEATMAP GRAPH ---
-            dcc.Graph(id='heatmap-graph', style={'marginTop': '-5px'})
-        ]),
-
-        # ==================== RQ4: INFRASTRUCTURE CAPACITY ====================
-        html.Div([
-            html.Hr(),
-            html.H1("Infrastructure Capacity Constraints Analysis", style={'textAlign': 'center'}),
-
-            # Row 1: Sankey (fig3) and Not Controlled (fig4) side by side
-            html.Div([
-                html.Div([
-                    dcc.Graph(
-                        id='sankey-graph',
-                        figure=fig3,
-                        style={'height': '500px'},
-                        responsive=True
-                    )
-                ], style={'flex': '1', 'minWidth': '0'}),
-
-                html.Div([
-                    dcc.Graph(
-                        id='not-controlled-graph',
-                        figure=fig4,
-                        style={'height': '500px'},
-                        responsive=True
-                    )
-                ], style={'flex': '1', 'minWidth': '0'})
-            ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px'}),
-
-            # Row 2: Controlled Alone (fig5) and Controlled Concurrent (fig6) side by side
-            html.Div([
-                html.Div([
-                    dcc.Graph(
-                        id='controlled-alone-graph',
-                        figure=fig5,
-                        style={'height': '500px'},
-                        responsive=True
-                    )
-                ], style={'flex': '1', 'minWidth': '0'}),
-
-                html.Div([
-                    dcc.Graph(
-                        id='controlled-concurrent-graph',
-                        figure=fig6,
-                        style={'height': '500px'},
-                        responsive=True
-                    )
-                ], style={'flex': '1', 'minWidth': '0'})
-            ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'marginTop': '10px'})
+                # RQ2 Charts - Row 2: Box plot (full width)
+                dcc.Graph(id="box_time_period")
+            ]),  # End of RQ2 section
         ])
-    ])
+    
+    # ==================== RQ3: OPERATIONAL EFFICIENCY ====================
+    def layout_efficiency(rq3_figs):
+        return html.Div([
+            html.Div([
+                html.Hr(),
+                html.H1("Operational Efficiency & Power Management", style={'textAlign': 'center'}),
+
+                # Timeline (full width)
+                dcc.Graph(figure=rq3_figs['timeline'], style={'height': '300px'}),
+
+                # Row: Bar chart, Scatter plot, Line chart side by side
+                html.Div([
+                    html.Div([
+                        dcc.Graph(figure=rq3_figs['bar_controlled'], style={'height': '400px'})
+                    ], style={'flex': '1', 'minWidth': '0'}),
+
+                    html.Div([
+                        dcc.Graph(figure=rq3_figs['scatter_preq_pset'], style={'height': '400px'})
+                    ], style={'flex': '2', 'minWidth': '0'}),
+
+                    html.Div([
+                        dcc.Graph(figure=rq3_figs['line_power_time'], style={'height': '400px'})
+                    ], style={'flex': '2', 'minWidth': '0'})
+                ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'marginTop': '10px'})
+            ]),
+        ])
+    
+    # ==================== RQ1: HEATMAP UTILIZATION ====================
+    def layout_heatmap():
+        return html.Div([
+            html.Div([
+                html.Hr(),
+                html.H1("Utilization Heatmap Analysis", style={'textAlign': 'center'}),
+
+                # --- RQ1 CONTROL PANEL ---
+                html.Div([
+                    # Left: Dynamic Title
+                    html.H2(id='chart-title', children="Sessions by Hour and Day", style={
+                        'margin': '0', 'fontSize': '1.5em', 'minWidth': '350px'
+                    }),
+
+                    # Center: Legend
+                    html.Div(id='highlight-legend', style={'display': 'none', 'alignItems': 'center'}, children=[
+                        html.Div(
+                            style={'width': '10px', 'height': '10px', 'backgroundColor': 'green', 'marginRight': '5px'}),
+                        html.Span('Off-Peak Hours n = 57 (3.1%)', style={'marginRight': '15px', 'fontSize': '0.9em'}),
+                        html.Div(style={'width': '10px', 'height': '10px', 'backgroundColor': 'red', 'marginRight': '5px'}),
+                        html.Span('Business Hours n = 1503 (80%)', style={'fontSize': '0.9em'}),
+                    ]),
+
+                    # Right: Controls
+                    html.Div([
+                        html.Div([
+                            html.Label('Metric', style={'fontWeight': 'bold', 'marginRight': '10px'}),
+                            dcc.Dropdown(
+                                id='metric-dropdown',
+                                options=[
+                                    {'label': 'Session Counts', 'value': 'SESSIONS'},
+                                    {'label': 'Concurrent Overlaps', 'value': 'OVERLAPS'}
+                                ],
+                                value='SESSIONS',
+                                clearable=False,
+                                style={'width': '180px'}
+                            )
+                        ], style={'marginRight': '30px', 'display': 'flex', 'alignItems': 'center'}),
+
+                        html.Div([
+                            html.Div([
+                                html.Label('Show Labels'),
+                                dcc.Checklist(id='show-count-labels', options=[{'label': ' Yes', 'value': 'SHOW_TEXT'}],
+                                            value=[], inline=True)
+                            ], style={'marginRight': '15px'}),
+
+                            html.Div([
+                                html.Label('Show Highlights'),
+                                dcc.Checklist(id='show-highlight-boxes',
+                                            options=[{'label': ' Yes', 'value': 'SHOW_SHAPES'}],
+                                            value=[], inline=True)
+                            ])
+                        ], style={'display': 'flex', 'alignItems': 'center'})
+                    ], style={'display': 'flex', 'alignItems': 'center'})
+                ], style={
+                    'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center',
+                    'padding': '20px 10px 10px 10px', 'backgroundColor': '#f9f9f9', 'borderRadius': '5px'
+                }),
+
+                # --- RQ1 HEATMAP GRAPH ---
+                dcc.Graph(id='heatmap-graph', style={'marginTop': '-5px'})
+            ]),
+        ])
+    
+    # ==================== RQ4: INFRASTRUCTURE CAPACITY ====================
+    def layout_infrastructure():
+        return html.Div([
+            html.Div([
+                html.Hr(),
+                html.H1("Infrastructure Capacity Constraints Analysis", style={'textAlign': 'center'}),
+
+                # Row 1: Sankey (fig3) and Not Controlled (fig4) side by side
+                html.Div([
+                    html.Div([
+                        dcc.Graph(
+                            id='sankey-graph',
+                            figure=fig3,
+                            style={'height': '500px'},
+                            responsive=True
+                        )
+                    ], style={'flex': '1', 'minWidth': '0'}),
+
+                    html.Div([
+                        dcc.Graph(
+                            id='not-controlled-graph',
+                            figure=fig4,
+                            style={'height': '500px'},
+                            responsive=True
+                        )
+                    ], style={'flex': '1', 'minWidth': '0'})
+                ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px'}),
+
+                # Row 2: Controlled Alone (fig5) and Controlled Concurrent (fig6) side by side
+                html.Div([
+                    html.Div([
+                        dcc.Graph(
+                            id='controlled-alone-graph',
+                            figure=fig5,
+                            style={'height': '500px'},
+                            responsive=True
+                        )
+                    ], style={'flex': '1', 'minWidth': '0'}),
+
+                    html.Div([
+                        dcc.Graph(
+                            id='controlled-concurrent-graph',
+                            figure=fig6,
+                            style={'height': '500px'},
+                            responsive=True
+                        )
+                    ], style={'flex': '1', 'minWidth': '0'})
+                ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'marginTop': '10px'})
+            ])
+        ])
 
     ################################################################################################
     # CALLBACKS
     ################################################################################################
+
+    @app.callback(
+        Output('page-content', 'children'),
+        Input('url', 'pathname')
+    )
+    # Navigation bar callback
+    def display_page(pathname):
+        if pathname == '/revenue' or pathname == '/':
+            return layout_revenue(revenue_figs)
+        elif pathname == '/customer':
+            return layout_customer()
+        elif pathname == '/efficiency':
+            return layout_efficiency(rq3_figs)
+        elif pathname == '/heatmap':
+            return layout_heatmap()
+        elif pathname == '/infrastructure':
+            return layout_infrastructure()
+        else:
+            return html.H1("404: Page not found")
+
 
     # RQ1: Heatmap callback
     @app.callback(
